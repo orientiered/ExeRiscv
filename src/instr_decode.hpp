@@ -37,7 +37,7 @@ struct INSTR_DECOMP IType {
     uint32_t rd     : 11-6;
     uint32_t funct3 : 14-11;
     uint32_t rs1    : 19-14;
-    uint32_t imm11_0 : 31-24;
+    uint32_t imm11_0 : 31-19;
 
     int32_t imm() const {
         return SignExtend(imm11_0, 12);
@@ -54,7 +54,7 @@ struct INSTR_DECOMP SType {
     uint32_t imm11_5 : 31-24;
 
     int32_t imm() const {
-        return SignExtend((imm11_5 >> 5) + imm4_0, 12);
+        return SignExtend((imm11_5 << 5) | imm4_0, 12);
     }
 };
 
@@ -69,7 +69,7 @@ struct INSTR_DECOMP BType {
     uint32_t imm12  : 31-30;
 
     int32_t imm() const {
-        return SignExtend((imm12 >> 12) + (imm11 >> 11) + (imm10_5 >> 5) + (imm4_1 >> 1), 13); 
+        return SignExtend((imm12 << 12) | (imm11 << 11) | (imm10_5 << 5) | (imm4_1 << 1), 13); 
     }
 };
 
@@ -79,7 +79,7 @@ struct INSTR_DECOMP UType {
     uint32_t imm31_12 : 31-11; 
 
     int32_t imm() const { // no sign extension
-        return (imm31_12 >> 12);
+        return (imm31_12 << 12);
     }
 };
 
@@ -92,7 +92,7 @@ struct INSTR_DECOMP JType {
     uint32_t imm20: 1; 
 
     int32_t imm() const {
-        return SignExtend((imm20 >> 20) + (imm19_12 >> 12) + (imm11 >> 11) + (imm10_1 >> 1), 20);
+        return SignExtend((imm20 << 20) | (imm19_12 << 12) | (imm11 << 11) | (imm10_1 << 1), 21);
     }
 };
 

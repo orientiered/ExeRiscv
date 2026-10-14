@@ -1,5 +1,6 @@
 #include <iostream>
 #include <stdexcept>
+#include "model.hpp"
 #include "read_elf.hpp"
 
 int main(int argc, const char *argv[]) {
@@ -20,13 +21,13 @@ int main(int argc, const char *argv[]) {
         return 1;
     }
 
-    std::cout << elf.base_addr << " " << elf.entry_point << "\n";
-
-
-    for (uint32_t i = elf.entry_point - elf.base_addr, g = 0; i < elf.vmem.size() && g < 30; i += 4, g++) {
-        printf("%x %x\n", i + elf.base_addr, *reinterpret_cast<uint32_t*>(elf.vmem.data() + i));  
-    }
-
     
-    return 0;
+    // std::cout << elf.base_addr << " " << elf.entry_point << "\n";
+
+    // for (uint32_t i = elf.entry_point - elf.base_addr, g = 0; i < elf.vmem.size() && g < 30; i += 4, g++) {
+    //     printf("%x %x\n", i + elf.base_addr, *reinterpret_cast<uint32_t*>(elf.vmem.data() + i));  
+    // }
+
+    InterpreterState interpreter(elf, argc-1, argv+1);
+    return interpreter.execute();
 }
