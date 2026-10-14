@@ -7,8 +7,9 @@
 using RiscvInstr = uint32_t;
 
 struct ParsedElf {
-    uint32_t entry_point;
     uint32_t base_addr;
+    uint32_t entry_point;
+    uint32_t global_ptr = 0;
     std::vector<uint8_t> vmem;
 };
 

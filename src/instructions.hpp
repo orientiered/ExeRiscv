@@ -22,10 +22,10 @@ DECLARE_INSTR_R(Sub, 0b0110011, 0x0, 0x20, return a - b;);
 DECLARE_INSTR_R(Xor, 0b0110011, 0x4, 0x00, return a ^ b;);
 DECLARE_INSTR_R(Or,  0b0110011, 0x6, 0x00, return a | b;);
 DECLARE_INSTR_R(And, 0b0110011, 0x7, 0x00, return a & b;);
-DECLARE_INSTR_R(Sll, 0b0110011, 0x1, 0x00, return a << b;);
-DECLARE_INSTR_R(Srl, 0b0110011, 0x5, 0x00, return a >> b;);
+DECLARE_INSTR_R(Sll, 0b0110011, 0x1, 0x00, return a << ImmSlice(b, 0, 4););
+DECLARE_INSTR_R(Srl, 0b0110011, 0x5, 0x00, return a >> ImmSlice(b, 0, 4););
 DECLARE_INSTR_R(Sra, 0b0110011, 0x5, 0x20, 
-    return static_cast<int32_t>(a) >> b;
+    return static_cast<int32_t>(a) >> ImmSlice(b, 0, 4);
 );
 DECLARE_INSTR_R(Slt, 0b0110011, 0x2, 0x00, 
     return static_cast<int32_t>(a) < static_cast<int32_t>(b) ? 1 : 0;
@@ -56,7 +56,7 @@ struct Slli : InstructionBase<Slli, IType> {
         return i.opcode == opcode && i.funct3 == funct3 && 
                ImmSlice(i.imm(), 5, 11) == 0x00;
     }
-    static uint32_t compute(uint32_t r, uint32_t imm) { return r << imm; }
+    static uint32_t compute(uint32_t r, uint32_t imm) { return r << ImmSlice(imm, 0, 4); }
 };
 
 struct Srli : InstructionBase<Srli, IType> {
@@ -68,7 +68,7 @@ struct Srli : InstructionBase<Srli, IType> {
         return i.opcode == opcode && i.funct3 == funct3 && 
                ImmSlice(i.imm(), 5, 11) == 0x00;
     }
-    static uint32_t compute(uint32_t r, uint32_t imm) { return r >> imm; }
+    static uint32_t compute(uint32_t r, uint32_t imm) { return r >> ImmSlice(imm, 0, 4); }
 };
 
 struct Sali : InstructionBase<Sali, IType> {
@@ -81,11 +81,11 @@ struct Sali : InstructionBase<Sali, IType> {
                ImmSlice(i.imm(), 5, 11) == 0x20;
     }
     static uint32_t compute(uint32_t r, uint32_t imm) { 
-        return static_cast<int32_t>(r) >> imm; 
+        return static_cast<int32_t>(r) >> ImmSlice(imm, 0, 4); 
     }
 };
 
-DECLARE_INSTR_I(Slti, 0b0010011, 0x2, return static_cast<int32_t>(r) < imm ? 1 : 0;);
+DECLARE_INSTR_I(Slti, 0b0010011, 0x2, return static_cast<int32_t>(r) < static_cast<int32_t>(imm) ? 1 : 0;);
 DECLARE_INSTR_I(Sltiu, 0b0010011, 0x3, return (r < imm) ? 1 : 0;);
 
 // =========== I TYPE INSTRUCTIONS: loads ===================
@@ -140,7 +140,7 @@ struct Lhu : InstructionBase<Lhu, IType> {
 
     static int execute(InterpreterState& s, const Instr& i_raw) {
         IType i = FromRaw<IType>(i_raw);
-        s.regs[i.rd] = s.read<uint16_t>(s.regs[i.rs1] + i.imm());
+        s.setReg(i.rd, s.read<uint16_t>(s.regs[i.rs1] + i.imm()));
         return 0;
     }
 };
@@ -188,8 +188,9 @@ struct Jalr : InstructionBase<Jalr, IType> {
 
     static int execute(InterpreterState& s, const Instr& i_raw) {
         IType i = FromRaw<IType>(i_raw);
+        uint32_t target = s.regs[i.rs1] + i.imm();
         s.setReg(i.rd, s.pc + INSTR_SIZE);
-        s.next_pc = s.regs[i.rs1] + i.imm();
+        s.next_pc = target;
         return 0;
     }
 };
@@ -199,7 +200,7 @@ struct Lui : InstructionBase<Lui, UType> {
 
     static int execute(InterpreterState& s, const Instr& i_raw) {
         UType i = FromRaw<UType>(i_raw);
-        s.setReg(i.rd, i.imm() >> 12);
+        s.setReg(i.rd, i.imm());
         return 0;
     }
 };
@@ -209,7 +210,7 @@ struct Auipc : InstructionBase<Auipc, UType> {
 
     static int execute(InterpreterState& s, const Instr& i_raw) {
         UType i = FromRaw<UType>(i_raw);
-        s.setReg(i.rd, s.pc + (i.imm() >> 12));
+        s.setReg(i.rd, s.pc + i.imm());
         return 0;
     }
 };
@@ -297,4 +298,6 @@ using set = std::tuple<
 #define CAT_TUPLE_DEF(T1, T2) \
     decltype(std::tuple_cat(std::declval<T1>(), std::declval<T2>()))
 
-using RV32IM_set = CAT_TUPLE_DEF(RV32I::set, RV32ext_M::set);
+namespace RV32IM {
+    using set = CAT_TUPLE_DEF(RV32I::set, RV32ext_M::set);
+}

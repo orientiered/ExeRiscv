@@ -78,5 +78,36 @@ ParsedElf ElfReader::parseElf(std::string_view file_name)
         }
     }
 
+    // ======= Parsing section and symtab to find __global_pointer$ symbol
+    
+    for (int i = 0; i < header.e_shnum; i++) {
+        const void* offset = m_file.data() + header.e_shoff + i * header.e_shentsize;
+        Elf32_Shdr symtab_shdr = reinterpretLoad<Elf32_Shdr>(offset);
+
+        if (symtab_shdr.sh_type != SHT_SYMTAB) 
+            continue;
+
+        Elf32_Shdr strtab_shdr = reinterpretLoad<Elf32_Shdr>(m_file.data() + header.e_shoff + 
+            symtab_shdr.sh_link * header.e_shentsize);
+
+        size_t num_syms = symtab_shdr.sh_size / sizeof(Elf32_Sym);
+        char *strs = reinterpret_cast<char*>(m_file.data() + strtab_shdr.sh_offset);
+        Elf32_Sym *syms = reinterpret_cast<Elf32_Sym*>(m_file.data() + symtab_shdr.sh_offset); 
+
+        bool found = false;
+
+        for (size_t i = 0; i < num_syms; i++) {
+
+            char *name = &strs[syms[i].st_name];
+            if (strcmp(name, "__global_pointer$") == 0) {
+                result.global_ptr = syms[i].st_value;
+                found = true;
+                break;
+            }
+        }
+
+        if (found) break;
+    }
+
     return result;
 }

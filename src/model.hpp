@@ -1,21 +1,25 @@
 #pragma once
 #include <cstdint>
+#include <cstdio>
 #include <optional>
+#include <stdexcept>
 #include <vector>
 #include <array>
 
 #include "instr_decode.hpp"
 #include "read_elf.hpp"
 
-constexpr static inline uint32_t REG_COUNT = 32;
-constexpr static inline uint32_t STACK_SIZE = 16 * 1024;
-constexpr static inline uint32_t REG_SP = 2;
-constexpr static inline uint32_t REG_A0 = 10;
-constexpr static inline uint32_t INSTR_SIZE = sizeof(Instr);
+constexpr inline uint32_t REG_COUNT = 32;
+constexpr inline uint32_t STACK_SIZE = 512 * 1024; // 512 kB
+constexpr inline uint32_t REG_SP = 2;
+constexpr inline uint32_t REG_GP = 3;
+constexpr inline uint32_t REG_A0 = 10;
+constexpr inline uint32_t INSTR_SIZE = sizeof(Instr);
 
 constexpr inline int ILLEGAL_INSTR = -1;
 constexpr inline int HALT_CODE = -2;
 
+constexpr inline bool ASAN = true; 
 
 class InterpreterState {
 public:
@@ -42,13 +46,29 @@ public:
         return memory.data() + PhysAddr(virt_addr);
     }
 
+    void checkAddr(uint32_t virt_addr) {
+        if constexpr (!ASAN) {
+            return;
+        } else {
+            bool valid = virt_addr >= base_addr && virt_addr < base_addr + memory.size();
+            if (!valid) {
+                fprintf(stderr, "Invalid virtual address access encountered\n");
+                fprintf(stderr, "pc %x : instr %x\n", pc, fetch());
+                fprintf(stderr, "valid range: [%x:%zx), access to %x\n", base_addr, base_addr + memory.size(), virt_addr);
+                throw std::runtime_error("Illegal memory access");
+            }
+        }
+    }
+
     template<typename T>
     T read(uint32_t virt_addr) {
+        checkAddr(virt_addr);
         return *reinterpret_cast<T*>(MemAddr(virt_addr));
     }
 
     template<typename T>
     void write(T val, uint32_t virt_addr) {
+        checkAddr(virt_addr);
         *reinterpret_cast<T*>(MemAddr(virt_addr)) = val;
     }
 
@@ -60,22 +80,8 @@ public:
     uint32_t fetch() {
         return read<Instr>(pc);
     }
-    void incrementPC() {
-        pc += INSTR_SIZE;
-    }
 
     int execute();
-
-    template <class... Is>
-    int dispatch(const Instr& i, std::tuple<Is...>) {
-        int result = ILLEGAL_INSTR;
-        auto tryOne = [&]<class I>() {
-            if (result == ILLEGAL_INSTR && I::matches(i))
-                result = I::execute(*this, i);
-        };
-        (tryOne.template operator()<Is>(), ...);
-        return result;   // -1 → illegal instruction
-    }
 };
 
 template <class Derived, class Format> struct InstructionBase;
